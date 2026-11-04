@@ -1,8 +1,11 @@
 package org.shubham.fileuploadstuff.services;
 
+import jakarta.validation.constraints.NotNull;
 import org.shubham.fileuploadstuff.StorageException;
 import org.shubham.fileuploadstuff.StorageFileNotFoundException;
 import org.shubham.fileuploadstuff.configurationProperties.StorageProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -10,23 +13,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.Objects;
 import java.util.stream.Stream;
+
+import static java.rmi.server.LogStream.log;
 
 @Service
 class FileSystemStorageService implements StorageService {
 
+    private static final Logger log = LoggerFactory.getLogger(FileSystemStorageService.class);
     private final Path rootLocation;
 
     @Autowired
-    public FileSystemStorageService(StorageProperties properties){
-        if(properties.getLocation().trim().isEmpty()){
+    public FileSystemStorageService(StorageProperties properties) {
+        if (properties.getLocation().trim().isEmpty()) {
             throw new StorageException("You are trying to upload on empty location");
         }
 
@@ -36,63 +46,110 @@ class FileSystemStorageService implements StorageService {
     public void init() {
         try {
             Files.createDirectories(rootLocation);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new StorageException("Could not initialize storage", e);
         }
     }
 
     @Override
-    public void store(MultipartFile file) {
-        try{
-            if(file.isEmpty()){
+    public void store(String directory, @NotNull MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
                 throw new IOException("Failed to store empty file");
             }
 
-            Path destinationFile = this.rootLocation.resolve(
-                Paths.get(file.getOriginalFilename())).normalize().toAbsolutePath();
-                if(!destinationFile.getParent().equals(this.rootLocation.toAbsolutePath())){
-                    throw new StorageException("Cannot store file outside current directory");
-                }
+            String subDir = rootLocation + File.separator + directory;
 
-                try(InputStream inputStream = file.getInputStream()){
-                    Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-        }catch (IOException e){
+            Path directoryPath = Paths.get(subDir);
+            if(!Files.exists(directoryPath)){
+                Files.createDirectories(directoryPath);
+            }
+
+            String fileName = file.getOriginalFilename();
+            String newFileName = LocalDateTime.now(ZoneId.systemDefault()).toString().replace(":", "-") + "-" + fileName;
+
+
+            Path destinationFile = directoryPath.resolve(
+                    Paths.get(Objects.requireNonNull(newFileName))).normalize().toAbsolutePath();
+            if (!destinationFile.getParent().equals(directoryPath.toAbsolutePath())) {
+                throw new StorageException("Cannot store file outside current directory");
+            }
+//
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
             throw new StorageException("Failed to store file", e);
         }
     }
 
     @Override
-    public Stream<Path> loadAll() {
-        try{
-            return Files.walk(this.rootLocation, 1).filter(path -> !path.equals(this.rootLocation)).map(this.rootLocation::relativize);
-        }catch (IOException e){
+    public Stream<Path> loadAll(String directory) {
+        try {
+            String subDir = rootLocation + File.separator + directory;
+
+            Path directoryPath = Paths.get(subDir);
+            if(!Files.exists(directoryPath)){
+                Files.createDirectories(directoryPath);
+            }
+            return Files.walk(directoryPath, 1).filter(path -> !path.equals(directoryPath)).map(directoryPath::relativize);
+        } catch (IOException e) {
             throw new StorageException("Failed to read stored files", e);
         }
     }
 
     @Override
-    public Path load(String fileName) {
-        return rootLocation.resolve(fileName);
+    public Path load(String directory, String fileName) {
+        String subDir = rootLocation + File.separator + directory;
+        Path directoryPath = Paths.get(subDir);
+        if(!Files.exists(directoryPath)){
+            try {
+                Files.createDirectories(directoryPath);
+            } catch (IOException e) {
+                throw new StorageException("failed to load file", e);
+            }
+        }
+
+        return directoryPath.resolve(fileName);
     }
 
     @Override
-    public Resource loadAsResource(String fileName) {
-        try{
-            Path file = load(fileName);
+    public Resource loadAsResource(String directory, String fileName) {
+        try {
+            Path file = load(directory, fileName);
             Resource resource = new UrlResource(file.toUri());
-            if(resource.exists() || resource.isReadable()){
+            if (resource.exists() || resource.isReadable()) {
                 return resource;
-            }else{
+            } else {
+                System.out.println("HERE");
                 throw new StorageFileNotFoundException("Could not read file + " + fileName);
             }
-        }catch (MalformedURLException e){
+        } catch (MalformedURLException e) {
             throw new StorageFileNotFoundException("Could not read file: " + fileName, e);
         }
     }
 
-    public void deleteAll() {
-        FileSystemUtils.deleteRecursively(rootLocation.toFile());
+    @Override
+    public void deleteAll(String directory) {
+        String subDir = rootLocation + File.separator + directory;
+        Path directoryPath = Paths.get(subDir);
+
+        if(!Files.exists(directoryPath)){
+            try {
+                Files.createDirectories(directoryPath);
+            } catch (IOException e) {
+                throw new StorageException("couldnt delete", e);
+            }
+        }
+        FileSystemUtils.deleteRecursively(directoryPath.toFile());
+    }
+
+    @Override
+    public void delete(String directory, String fileName){
+        try {
+            FileSystemUtils.deleteRecursively(load(directory, fileName));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

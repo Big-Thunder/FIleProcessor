@@ -18,7 +18,7 @@
         <li th:each="file : ${files}">
             <a th:href="${file}" th:text="${file}"></a>
 
-            <form th:action="@{/delete/{fileName}(fileName=${#strings.substringAfter(file, 'files/')})}"
+            <form th:action="@{/delete/{file_name}(file_name=${#strings.substringAfter(file, 'files/')})}"
                   method="POST">
                 <input type="hidden" value="DELETE">
                 <button type="submit">Delete</button>
