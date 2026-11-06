@@ -1,10 +1,12 @@
 package org.shubham.fileuploadstuff.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.shubham.fileuploadstuff.SessionFileService;
-import org.shubham.fileuploadstuff.StorageFileNotFoundException;
+import org.shubham.fileuploadstuff.services.SessionFileService;
+import org.shubham.fileuploadstuff.Exceptions.StorageFileNotFoundException;
+import org.shubham.fileuploadstuff.entities.FileEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +15,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URI;
@@ -32,23 +33,23 @@ public class FileUploadController {
     @GetMapping("/")
     public String listUploadedFiles(Model model, HttpServletRequest request){
         String sessionId = request.getSession(true).getId();
-        model.addAttribute("files", sessionFileService.loadAll(sessionId).map(path -> MvcUriComponentsBuilder.fromMethodName(FileUploadController.class,
-                "serveFile", path.getFileName().toString(), request).build().toUri().toString().replace("%20", " ")).collect(Collectors.toList()));
-
+        model.addAttribute("files", sessionFileService.loadAll(sessionId).collect(Collectors.toList()));
         return "index";
     }
 
-    @GetMapping("/files/{fileName:.+}")
+    @GetMapping("/files/{fileId:.+}")
     @ResponseBody
-    public ResponseEntity<Resource> serveFile(@PathVariable String fileName, HttpServletRequest request){
-        Resource file = sessionFileService.loadAsResource(request.getSession(true).getId(), fileName);
+    public ResponseEntity<Resource> serveFile(@PathVariable Long fileId, HttpServletRequest request){
+        Resource file = sessionFileService.loadAsResource(request.getSession(true).getId(), fileId);
+        FileEntity fileEntity = sessionFileService.load(request.getSession().getId(), fileId);
 
         if(file == null){
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\""+file.getFilename()+"\"").body(file);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileEntity.getFile_name()).build().toString())
+                .body(file);
     }
 
     @PostMapping("/")
@@ -59,13 +60,13 @@ public class FileUploadController {
         return "redirect:/";
     }
 
-    @PostMapping("/delete/{fileName:.+}")
-    public String handleFileDelete(@PathVariable("fileName") String fileName, RedirectAttributes redirectAttributes, HttpServletRequest request){
-        System.out.println("Deleting: " + fileName);
+    @PostMapping("/delete/{fileId:.+}")
+    public String handleFileDelete(@PathVariable("fileId") Long fileId, RedirectAttributes redirectAttributes, HttpServletRequest request){
+        System.out.println("Deleting: " + fileId);
 
-        sessionFileService.delete(fileName, request.getSession(true).getId());
+        sessionFileService.delete(request.getSession(true).getId(), fileId);
 
-        redirectAttributes.addFlashAttribute("message", "deleted file " + fileName);
+        redirectAttributes.addFlashAttribute("message", "deleted file " + fileId);
 
         return "redirect:/";
     }

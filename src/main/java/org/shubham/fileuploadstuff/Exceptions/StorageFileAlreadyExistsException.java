@@ -1,4 +1,4 @@
-package org.shubham.fileuploadstuff;
+package org.shubham.fileuploadstuff.Exceptions;
 
 public class StorageFileAlreadyExistsException extends StorageException{
     public StorageFileAlreadyExistsException(String message) {

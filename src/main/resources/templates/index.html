@@ -2,8 +2,9 @@
 <body>
 
 <div th:if="${message}">
-    <h2 th:text="${message}"/>
+    <h2 th:text="${message}"></h2>
 </div>
+
 <div>
     <form method="POST" enctype="multipart/form-data" action="/">
         <table>
@@ -15,12 +16,9 @@
 
 <div>
     <ul>
-        <li th:each="file : ${files}">
-            <a th:href="${file}" th:text="${file}"></a>
-
-            <form th:action="@{/delete/{file_name}(file_name=${#strings.substringAfter(file, 'files/')})}"
-                  method="POST">
-                <input type="hidden" value="DELETE">
+        <li th:each="f : ${files}">
+            <a th:href="@{/files/{id}(id=${f.file_id})}" th:text="${f.file_name}"></a>
+            <form th:action="@{/delete/{id}(id=${f.file_id})}" method="post" style="display:inline">
                 <button type="submit">Delete</button>
             </form>
         </li>

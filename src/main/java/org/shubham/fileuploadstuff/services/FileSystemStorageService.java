@@ -1,8 +1,8 @@
 package org.shubham.fileuploadstuff.services;
 
 import jakarta.validation.constraints.NotNull;
-import org.shubham.fileuploadstuff.StorageException;
-import org.shubham.fileuploadstuff.StorageFileNotFoundException;
+import org.shubham.fileuploadstuff.Exceptions.StorageException;
+import org.shubham.fileuploadstuff.Exceptions.StorageFileNotFoundException;
 import org.shubham.fileuploadstuff.configurationProperties.StorageProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,15 +18,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.nio.file.*;
-import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
 import java.util.Objects;
 import java.util.stream.Stream;
-
-import static java.rmi.server.LogStream.log;
 
 @Service
 class FileSystemStorageService implements StorageService {
@@ -52,7 +47,7 @@ class FileSystemStorageService implements StorageService {
     }
 
     @Override
-    public void store(String directory, @NotNull MultipartFile file) {
+    public Path store(String directory, @NotNull MultipartFile file) {
         try {
             if (file.isEmpty()) {
                 throw new IOException("Failed to store empty file");
@@ -78,6 +73,8 @@ class FileSystemStorageService implements StorageService {
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
             }
+
+            return destinationFile;
         } catch (IOException e) {
             throw new StorageException("Failed to store file", e);
         }
@@ -100,6 +97,7 @@ class FileSystemStorageService implements StorageService {
 
     @Override
     public Path load(String directory, String fileName) {
+        System.out.println("FileStorage: Loading " + fileName);
         String subDir = rootLocation + File.separator + directory;
         Path directoryPath = Paths.get(subDir);
         if(!Files.exists(directoryPath)){
@@ -115,6 +113,7 @@ class FileSystemStorageService implements StorageService {
 
     @Override
     public Resource loadAsResource(String directory, String fileName) {
+        System.out.println("FileStorage:: loading file as resource" + fileName);
         try {
             Path file = load(directory, fileName);
             Resource resource = new UrlResource(file.toUri());

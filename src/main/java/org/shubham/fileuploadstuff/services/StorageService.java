@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 public interface StorageService {
     void init();
 
-    void store(String directory, MultipartFile file);
+    Path store(String directory, MultipartFile file);
 
     Stream<Path> loadAll(String directory);
 
