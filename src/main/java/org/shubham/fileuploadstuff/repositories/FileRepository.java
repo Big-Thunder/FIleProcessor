@@ -9,4 +9,5 @@ public interface FileRepository extends CrudRepository<FileEntity, Long> {
     FileEntity findFileEntitiesByFileName(String fileName);
     List<FileEntity> findFileEntitiesByOwnerId(String ownerId);
     FileEntity findFileEntityByFileIdAndOwnerId(Long fileId, String ownerId);
+    void deleteAllByOwnerId(String ownerId);
 }

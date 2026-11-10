@@ -25,8 +25,6 @@ import java.util.stream.Stream;
 
 @Service
 class FileSystemStorageService implements StorageService {
-
-    private static final Logger log = LoggerFactory.getLogger(FileSystemStorageService.class);
     private final Path rootLocation;
 
     @Autowired
@@ -35,7 +33,7 @@ class FileSystemStorageService implements StorageService {
             throw new StorageException("You are trying to upload on empty location");
         }
 
-        this.rootLocation = Paths.get(properties.getLocation());
+        this.rootLocation = Paths.get(properties.getLocation()).toAbsolutePath().normalize();
     }
 
     public void init() {
@@ -47,7 +45,7 @@ class FileSystemStorageService implements StorageService {
     }
 
     @Override
-    public Path store(String directory, @NotNull MultipartFile file) {
+    public String store(String directory, @NotNull MultipartFile file) {
         try {
             if (file.isEmpty()) {
                 throw new IOException("Failed to store empty file");
@@ -74,7 +72,7 @@ class FileSystemStorageService implements StorageService {
                 Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            return destinationFile;
+            return rootLocation.relativize(destinationFile).toString();
         } catch (IOException e) {
             throw new StorageException("Failed to store file", e);
         }
@@ -96,35 +94,34 @@ class FileSystemStorageService implements StorageService {
     }
 
     @Override
-    public Path load(String directory, String fileName) {
-        System.out.println("FileStorage: Loading " + fileName);
-        String subDir = rootLocation + File.separator + directory;
-        Path directoryPath = Paths.get(subDir);
-        if(!Files.exists(directoryPath)){
-            try {
-                Files.createDirectories(directoryPath);
-            } catch (IOException e) {
-                throw new StorageException("failed to load file", e);
-            }
+    public Path load(String storageKey) {
+        Path file = rootLocation.resolve(storageKey).normalize();
+
+        if (!file.startsWith(rootLocation)) {
+            throw new StorageException("Cannot access file outside storage");
         }
 
-        return directoryPath.resolve(fileName);
+        if (!Files.isRegularFile(file)) {
+            throw new StorageFileNotFoundException("File not found");
+        }
+
+        return file;
     }
 
     @Override
-    public Resource loadAsResource(String directory, String fileName) {
-        System.out.println("FileStorage:: loading file as resource" + fileName);
+    public Resource loadAsResource(String storageKey) {
+        System.out.println("FileStorage:: loading file as resource" + storageKey);
         try {
-            Path file = load(directory, fileName);
+            Path file = load(storageKey);
             Resource resource = new UrlResource(file.toUri());
-            if (resource.exists() || resource.isReadable()) {
+            if (resource.exists() && resource.isReadable()) {
                 return resource;
             } else {
                 System.out.println("HERE");
-                throw new StorageFileNotFoundException("Could not read file + " + fileName);
+                throw new StorageFileNotFoundException("Could not read file ");
             }
         } catch (MalformedURLException e) {
-            throw new StorageFileNotFoundException("Could not read file: " + fileName, e);
+            throw new StorageFileNotFoundException("Could not read file: " + e);
         }
     }
 
@@ -144,9 +141,9 @@ class FileSystemStorageService implements StorageService {
     }
 
     @Override
-    public void delete(String directory, String fileName){
+    public void delete(String storageKey){
         try {
-            FileSystemUtils.deleteRecursively(load(directory, fileName));
+            Files.delete(load(storageKey));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

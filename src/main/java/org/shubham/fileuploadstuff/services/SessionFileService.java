@@ -42,19 +42,19 @@ public class SessionFileService {
     }
 
     public Resource loadAsResource(String sessionId, Long fileId){
-        if(load(sessionId, fileId) == null){
-            return null;
-        }
-        return storageService.loadAsResource(sessionId, load(sessionId, fileId).getFile_storage_path());
+        FileEntity fileEntity = load(sessionId, fileId);
+        return storageService.loadAsResource(fileEntity.getFile_storage_path());
     }
 
     public void deleteAll(String sessionId){
         storageService.deleteAll(sessionId);
-        fileRepository.deleteById(Long.parseLong(sessionId));
+        fileRepository.deleteAllByOwnerId(sessionId);
     }
 
     public void delete(String sessionId, Long fileId){
-        storageService.delete(sessionId, load(sessionId, fileId).getFile_storage_path());
+        FileEntity fileEntity = load(sessionId, fileId);
+
+        storageService.delete(fileEntity.getFile_storage_path());
         fileRepository.deleteById(fileId);
     }
 }

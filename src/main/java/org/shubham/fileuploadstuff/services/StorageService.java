@@ -11,15 +11,15 @@ import java.util.stream.Stream;
 public interface StorageService {
     void init();
 
-    Path store(String directory, MultipartFile file);
+    String store(String directory, MultipartFile file);
 
     Stream<Path> loadAll(String directory);
 
-    Path load(String directory, String fileName);
+    Path load(String storageKey);
 
-    Resource loadAsResource(String directory, String fileName);
+    Resource loadAsResource(String storageKey);
 
     void deleteAll(String directory);
 
-    void delete(String directory, String fileName);
+    void delete(String storageKey);
 }
